@@ -5,7 +5,11 @@ function rejectIf(condition, message) {
     throw new Error(message);
   }
 }
- 
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export const resolvers = {
   Query: {
     job: (_root, { id }) => Job.findById(id),
@@ -14,8 +18,9 @@ export const resolvers = {
   },
 
   Mutation: {
-    createJob: (_root, { input }, { user }) => {
+    createJob: async (_root, { input }, { user }) => {
       rejectIf(!user, 'Unathorized');
+      // await delay(2000);
       return Job.create({ ...input, companyId: user.companyId })
     },
     deleteJob: async (_root, { id }, { user }) => {
