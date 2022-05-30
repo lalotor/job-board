@@ -1,8 +1,9 @@
-import { Company, Job } from './db.js'
+import { nanoid } from 'nanoid';
+import { db } from './db.js';
 
-function rejectIf(condition, message) {
+function rejectIf(condition) {
   if (condition) {
-    throw new Error(message);
+    throw new Error('Unauthorized');
   }
 }
 
@@ -12,38 +13,40 @@ function delay(ms) {
 
 export const resolvers = {
   Query: {
-    job: (_root, { id }) => Job.findById(id),
-    jobs: () => Job.findAll(),
-    company: (_root, { id }) => Company.findById(id),
+    company: async (_root, { id }) => {
+      return await db.select().from('companies').where('id', id).first();
+    },
+    job: async (_root, { id }) => {
+      return await db.select().from('jobs').where('id', id).first();
+    },
+    jobs: async () => {
+      return await db.select().from('jobs');
+    },
   },
 
   Mutation: {
     createJob: async (_root, { input }, { user }) => {
-      rejectIf(!user, 'Unathorized');
+      rejectIf(!user);
       // await delay(2000);
-      return Job.create({ ...input, companyId: user.companyId })
-    },
-    deleteJob: async (_root, { id }, { user }) => {
-      rejectIf(!user, 'Unathorized');
-      const job = await Job.findById(id);
-      rejectIf(!job, 'Job does not exist');
-      rejectIf(job.companyId !== user.companyId, 'You cannot delete jobs from others companies');
-      return Job.delete(id);
-    },
-    updateJob: async (_root, { input }, { user }) => {
-      rejectIf(!user, 'Unathorized');
-      const job = await Job.findById(input.id);
-      rejectIf(!job, 'Job does not exist');
-      rejectIf(job.companyId !== user.companyId, 'You cannot update jobs from others companies');
-      return Job.update({ ...input, companyId: user.companyId });
+      const job = {
+        id: nanoid(),
+        companyId: user.companyId,
+        ...input,
+      };
+      await db.insert(job).into('jobs');
+      return job;
     },
   },
 
   Company: {
-    jobs: (company) => Job.findAll((job) => job.companyId === company.id),
+    jobs: async (company) => {
+      return await db.select().from('jobs').where('companyId', company.id);
+    },
   },
 
   Job: {
-    company: (job) => Company.findById(job.companyId),
+    company: async (job, _args, { companyLoader }) => {
+      return await companyLoader.load(job.companyId);
+    },
   },
 };
